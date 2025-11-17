@@ -43,7 +43,7 @@ Contributions, suggestions, and improvements are welcome! Feel free to open an i
 
 ## 📜 License
 
-This repository is available under the MIT License. See `LICENSE` for details.
+This repository is available under the MIT License.
 
 ---
 
