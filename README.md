@@ -1,39 +1,50 @@
-## Overview ##
+# Financial Projects Repository
 
-This repository contains my personal projects focused on entry-level fintech tools, starting with a Compound Interest Calculator built using React and Next.js. As a budding developer in financial technology, I'm using this space to demonstrate my growing skills in web development, financial calculations, and user-friendly UI design. The goal is to create practical tools that simplify financial concepts, while showcasing my ability to implement features like real-time calculations, responsive design, and basic state management.
-This is an ongoing portfolio repo where I'll add more fintech projects over time, such as budgeting apps, stock trackers, or loan simulators, to highlight my progress in JavaScript, React ecosystems, and fintech principles.
+Welcome to the **Financial Projects** repository! This repo contains a growing collection of tools, utilities, and experiments related to personal finance, investing, and data-driven financial analysis.
 
-Tech Stack
-Frontend: React.js with Next.js (for server-side rendering and routing)
-Styling: Tailwind CSS (for responsive and modern UI)
-State Management: React Hooks (useState, useEffect)
-Deployment: Ready for Vercel or Netlify (live demo coming soon)
-Other Tools: Git for version control, npm/Yarn for package management
+## 📂 Project Structure
 
-Installation
-To run this project locally:
+Below is the current layout of the repository. More folders and projects will be added over time.
 
-Clone the repository: git clone https://github.com/chan-eth/projects.git
-Navigate to the project directory: cd projects/Compund-Interest-Calc+
-Install dependencies: npm install (Or yarn install if using Yarn)
-Start the development server: npm run devOpen http://localhost:3000 in your browser to view the app.
+### **Current Projects**
 
-Usage
+* **Compound Interest Calculator**
+  A simple and extensible calculator for modeling compound interest over time. Useful for estimating investment growth, savings plans, long-term projections, and dollar-cost averaging scenarios.
 
-Compound Interest Calculator: Enter principal amount, interest rate, time period, and compounding frequency. The app calculates and displays the future value with a breakdown.
-Make changes to the code in app/page.tsx (the root component) and see live updates in dev mode.
-Explore the components/ folder for reusable UI elements like forms and charts.
+## 🚀 Planned Additions
 
-<img width="1022" height="1191" alt="image" src="https://github.com/user-attachments/assets/e5a48de4-c068-4c2d-9d15-f7415b702854" />
+This repository will expand with additional financial tools such as:
 
-What I Learned
+* Budgeting tools
+* DCA analyzers
+* Mining profitability calculators
+* Asset allocation simulators
+* Retirement projections
+* Market data scrapers and dashboards
 
-Implementing financial formulas in code.
-Building interactive UIs with React and optimizing for performance using Next.js.
-Version control best practices with Git and GitHub.
-Debugging and iterating on user feedback to improve UX.
+If you add a new project folder, consider updating this README with:
 
-This project represents my entry-level skills, and I'm excited to expand it as I learn more about fintech, including APIs for real-time data and security considerations.
+* A short description
+* Purpose of the tool
+* How to run it
 
-Contributing
-If you'd like to suggest improvements or collaborate, feel free to fork the repo and submit a pull request. I'm open to feedback as I grow my skills!
+## 🛠️ Getting Started
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/chan-eth/projects.git
+   ```
+2. Navigate into any project folder to use or run its specific tools.
+
+## 🤝 Contributing
+
+Contributions, suggestions, and improvements are welcome! Feel free to open an issue or submit a pull request.
+
+## 📜 License
+
+This repository is available under the MIT License. See `LICENSE` for details.
+
+---
+
+Feel free to customize this README to better match your workflow and future project additions.
