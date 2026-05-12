@@ -63,54 +63,128 @@ put` or by switching the CLIs to the `@cloudflare/r2` SDK in Phase 2.
 
 ## Deployment
 
-### 1. Cloudflare Worker + D1 + R2 + Queue
+Three environments live side-by-side in `apps/worker/wrangler.toml`: the
+top-level block is for `wrangler dev` (placeholder bindings), and the two
+`[env.staging]` / `[env.production]` blocks hold the real resources.
+
+Stand staging up first, smoke-test, then repeat for production. Anything
+in `< >` is something you fill in.
+
+### Deploying to staging
 
 ```bash
-# from apps/worker
-wrangler login
-wrangler d1 create backtest                # paste database_id into wrangler.toml
-wrangler r2 bucket create backtest-data
-wrangler queues create backtest-jobs
+# 1. One-time: log in to the right Cloudflare account.
+pnpm --filter @bt/worker exec wrangler login
 
-wrangler d1 migrations apply backtest --remote
-
-wrangler secret put KALSHI_API_KEY_ID
-wrangler secret put KALSHI_PRIVATE_KEY_PEM
-wrangler secret put CFBENCHMARKS_TOKEN
-wrangler secret put WORKER_INTERNAL_SECRET
-
-wrangler deploy
+# 2. Create the per-env resources. Paste each printed id/name into the
+#    matching [env.staging] block of apps/worker/wrangler.toml.
+pnpm --filter @bt/worker exec wrangler d1 create backtest-staging
+pnpm --filter @bt/worker exec wrangler r2 bucket create backtest-data-staging
+pnpm --filter @bt/worker exec wrangler queues create backtest-jobs-staging
 ```
 
-In Cloudflare DNS, point `api.getdebanked.xyz` at this Worker (route is
-declared in `wrangler.toml`).
+3. **Rate-limit namespaces** — Cloudflare dashboard → Workers & Pages →
+   Rate Limiting → create two namespaces; paste their integer IDs into the
+   `[[env.staging.unsafe.bindings]]` blocks (`RL_GLOBAL`, `RL_RUNS`).
 
-### 2. Vercel (apps/web)
+```bash
+# 4. Apply migrations to the staging D1.
+pnpm --filter @bt/worker migrate:staging
 
-* Import `chan-eth/Financial-Projects` into Vercel.
-* **Root directory:** `backtesting-platform/apps/web`.
-* Framework preset: Next.js.
-* Environment variables:
+# 5. Set the four secrets. wrangler prompts for each value.
+pnpm --filter @bt/worker exec wrangler secret put KALSHI_API_KEY_ID --env staging
+pnpm --filter @bt/worker exec wrangler secret put KALSHI_PRIVATE_KEY_PEM --env staging
+pnpm --filter @bt/worker exec wrangler secret put CFBENCHMARKS_TOKEN --env staging
+pnpm --filter @bt/worker exec wrangler secret put WORKER_INTERNAL_SECRET --env staging
 
-  | Name                        | Value                                          | Scope    |
-  | --------------------------- | ---------------------------------------------- | -------- |
-  | `NEXT_PUBLIC_API_BASE`      | `https://api.getdebanked.xyz`                  | client + server |
-  | `WORKER_INTERNAL_SECRET`    | same string set on the Worker                  | server only |
+# 6. Deploy. Records the *.workers.dev URL; copy it for the smoke test.
+pnpm --filter @bt/worker deploy:staging
 
-* Domain: assign `getdebanked.xyz`. Cloudflare DNS handles the apex CNAME flatten
-  to Vercel's `cname.vercel-dns.com`.
+# 7. Tiny ingest — 7 days for the smoke test before you pay for full coverage.
+pnpm tsx scripts/ingest-hyperliquid.ts --symbol BTC --timeframe 1h --days 7
 
-The browser only ever talks to Vercel; Vercel proxies through
-`apps/web/app/api/proxy/[...path]/route.ts` to the Worker, attaching
-`x-internal-secret`. Worker secrets never reach the bundle.
+# 8. Upload the produced JSONL to staging R2. (CLIs write to .local-r2/.)
+for f in $(find .local-r2/data -type f); do
+  key=${f#.local-r2/}
+  pnpm --filter @bt/worker exec wrangler r2 object put \
+    "backtest-data-staging/$key" --file "$f" --remote
+done
+```
 
-### 3. CI (optional, recommended)
+9. **Smoke test** — replace `<URL>` with the staging `*.workers.dev` URL and
+   `<SECRET>` with the value you set for `WORKER_INTERNAL_SECRET`:
 
-* GitHub Action on push to `main` touching `apps/worker/**` or `packages/**`
-  runs `pnpm install`, `pnpm --filter @bt/worker exec wrangler deploy`, and
-  `wrangler d1 migrations apply backtest --remote`.
-* Vercel auto-deploys on push (ignore-build script: skip when only
-  `apps/worker/**`, `packages/**`, `scripts/**` changed).
+```bash
+curl -s -X POST "<URL>/runs" \
+  -H "content-type: application/json" \
+  -H "x-internal-secret: <SECRET>" \
+  -d '{"config":{"strategy":{"kind":"hyperliquid","symbol":"BTC","timeframe":"1h","fastEma":12,"slowEma":48,"riskPerTradeBps":50,"takerFeeBps":4,"makerFeeBps":1,"slippageBps":2},"symbol":"BTC","timeframe":"1h","startTs":'$(($(date +%s) - 7*86400))',"endTs":'$(date +%s)',"initialCashUsd":100000}}'
+# -> {"runId":"...","status":"queued"}
+
+# Poll until status === "succeeded":
+curl -s "<URL>/runs/<runId>" -H "x-internal-secret: <SECRET>" | jq .run.status
+
+# Fetch the tearsheet:
+curl -s "<URL>/runs/<runId>/tearsheet" -H "x-internal-secret: <SECRET>" | jq .metrics
+```
+
+If the smoke run succeeds, staging is good. If it `failed`, check the run row's
+`metrics_json.error` for the engine error, or `wrangler tail --env staging` for
+the Worker logs.
+
+### Deploying to production
+
+Same shape as staging, with three additional steps:
+
+1. **Cloudflare Access** (one-time, dashboard) — Zero Trust → Access →
+   Applications → "Add an application". Protect both `getdebanked.xyz` and
+   `api.getdebanked.xyz`. Identity provider: GitHub or Google. Policy: `email
+   is <list>`. The same emails go in `OPERATOR_EMAILS` in the
+   `[env.production.vars]` block.
+
+2. **Wrangler resources, migrations, secrets, deploy** — same commands as
+   staging with `--env production` and the prod bucket/queue/D1 names:
+
+```bash
+pnpm --filter @bt/worker exec wrangler d1 create backtest
+pnpm --filter @bt/worker exec wrangler r2 bucket create backtest-data
+pnpm --filter @bt/worker exec wrangler queues create backtest-jobs
+# paste IDs into [env.production] in wrangler.toml
+pnpm --filter @bt/worker migrate:production
+pnpm --filter @bt/worker exec wrangler secret put KALSHI_API_KEY_ID --env production
+pnpm --filter @bt/worker exec wrangler secret put KALSHI_PRIVATE_KEY_PEM --env production
+pnpm --filter @bt/worker exec wrangler secret put CFBENCHMARKS_TOKEN --env production
+pnpm --filter @bt/worker exec wrangler secret put WORKER_INTERNAL_SECRET --env production
+pnpm --filter @bt/worker deploy:production
+```
+
+3. **Vercel** —
+
+   - Import `chan-eth/Financial-Projects` into Vercel.
+   - **Root directory:** `backtesting-platform/apps/web`.
+   - Framework preset: Next.js.
+   - Env vars:
+
+     | Name                     | Value                                | Scope           |
+     | ------------------------ | ------------------------------------ | --------------- |
+     | `NEXT_PUBLIC_API_BASE`   | `https://api.getdebanked.xyz`        | all environments |
+     | `WORKER_INTERNAL_SECRET` | same value as the Worker secret      | production server only |
+
+   - Domain: assign `getdebanked.xyz`. The browser only ever talks to Vercel;
+     Vercel server-side proxies through
+     `apps/web/app/api/proxy/[...path]/route.ts` and attaches `x-internal-secret`.
+
+4. **DNS** — `api.getdebanked.xyz` → Worker route (declared in
+   `wrangler.toml`); `getdebanked.xyz` apex → CNAME-flatten to
+   `cname.vercel-dns.com`.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` already runs `pnpm install` → `pnpm -r typecheck` →
+engine tests → web build → `pnpm audit --audit-level=high` on every PR
+touching `backtesting-platform/**`. Set this check as **required** in branch
+protection. Worker + Vercel deploys are intentionally manual today —
+auto-deploy is a Phase 2 follow-up (see `Known follow-ups`).
 
 ## Security model
 

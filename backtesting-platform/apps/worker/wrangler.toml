@@ -1,44 +1,41 @@
-name = "backtest-worker"
+name = "backtest-worker-dev"
 main = "src/index.ts"
 compatibility_date = "2025-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Production route binds api.getdebanked.xyz to this worker.
-routes = [
-  { pattern = "api.getdebanked.xyz/*", zone_name = "getdebanked.xyz" },
-]
+# Top-level block = `wrangler dev` defaults. Replace the placeholder IDs with
+# real ones if you want `wrangler dev --remote` to hit real resources. For
+# real deploys use `--env staging` or `--env production` below.
 
 [observability]
 enabled = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "backtest"
+database_name = "backtest-dev"
 database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
 migrations_dir = "../../infra/d1/migrations"
 
 [[r2_buckets]]
 binding = "DATA"
-bucket_name = "backtest-data"
+bucket_name = "backtest-data-dev"
 
 [[queues.producers]]
 binding = "Q"
-queue = "backtest-jobs"
+queue = "backtest-jobs-dev"
 
 [[queues.consumers]]
-queue = "backtest-jobs"
+queue = "backtest-jobs-dev"
 max_batch_size = 1
 max_batch_timeout = 5
 max_retries = 3
 
-# 60 requests/min/IP across all routes.
 [[unsafe.bindings]]
 name = "RL_GLOBAL"
 type = "ratelimit"
 namespace_id = "1001"
 simple = { limit = 60, period = 60 }
 
-# 10 POST /runs/min/IP. Run-creation is the expensive path; tighten it harder.
 [[unsafe.bindings]]
 name = "RL_RUNS"
 type = "ratelimit"
@@ -46,12 +43,107 @@ namespace_id = "1002"
 simple = { limit = 10, period = 60 }
 
 [vars]
-ALLOWED_ORIGINS = "https://getdebanked.xyz"
-# OPERATOR_EMAILS = "you@example.com" — set per-env, comma-separated. Required
-# alongside the Cloudflare Access policy on getdebanked.xyz.
+ALLOWED_ORIGINS = "http://localhost:3000"
 
-# Secrets set via `wrangler secret put`:
+# Secrets for every env are set with `wrangler secret put <NAME> --env <env>`:
 #   KALSHI_API_KEY_ID
 #   KALSHI_PRIVATE_KEY_PEM
 #   CFBENCHMARKS_TOKEN
 #   WORKER_INTERNAL_SECRET
+
+# -----------------------------------------------------------------------------
+# Staging
+# -----------------------------------------------------------------------------
+
+[env.staging]
+name = "backtest-worker-staging"
+
+[env.staging.observability]
+enabled = true
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "backtest-staging"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create_staging"
+migrations_dir = "../../infra/d1/migrations"
+
+[[env.staging.r2_buckets]]
+binding = "DATA"
+bucket_name = "backtest-data-staging"
+
+[[env.staging.queues.producers]]
+binding = "Q"
+queue = "backtest-jobs-staging"
+
+[[env.staging.queues.consumers]]
+queue = "backtest-jobs-staging"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+
+[[env.staging.unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.unsafe.bindings]]
+name = "RL_RUNS"
+type = "ratelimit"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }
+
+[env.staging.vars]
+ALLOWED_ORIGINS = "https://*.vercel.app"
+# Set OPERATOR_EMAILS here once the Cloudflare Access policy is in place.
+# OPERATOR_EMAILS = "you@example.com"
+
+# -----------------------------------------------------------------------------
+# Production
+# -----------------------------------------------------------------------------
+
+[env.production]
+name = "backtest-worker"
+routes = [
+  { pattern = "api.getdebanked.xyz/*", zone_name = "getdebanked.xyz" },
+]
+
+[env.production.observability]
+enabled = true
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "backtest"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create_production"
+migrations_dir = "../../infra/d1/migrations"
+
+[[env.production.r2_buckets]]
+binding = "DATA"
+bucket_name = "backtest-data"
+
+[[env.production.queues.producers]]
+binding = "Q"
+queue = "backtest-jobs"
+
+[[env.production.queues.consumers]]
+queue = "backtest-jobs"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+
+[[env.production.unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "3001"
+simple = { limit = 60, period = 60 }
+
+[[env.production.unsafe.bindings]]
+name = "RL_RUNS"
+type = "ratelimit"
+namespace_id = "3002"
+simple = { limit = 10, period = 60 }
+
+[env.production.vars]
+ALLOWED_ORIGINS = "https://getdebanked.xyz"
+# Required alongside the Cloudflare Access policy on getdebanked.xyz.
+# OPERATOR_EMAILS = "you@example.com"
