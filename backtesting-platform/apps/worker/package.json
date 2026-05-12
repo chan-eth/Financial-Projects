@@ -7,10 +7,13 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
-    "migrate:local": "wrangler d1 migrations apply backtest --local",
-    "migrate:remote": "wrangler d1 migrations apply backtest --remote"
+    "migrate:local": "wrangler d1 migrations apply backtest-dev --local",
+    "migrate:staging": "wrangler d1 migrations apply backtest-staging --env staging --remote",
+    "migrate:production": "wrangler d1 migrations apply backtest --env production --remote"
   },
   "dependencies": {
     "@bt/data": "workspace:*",
