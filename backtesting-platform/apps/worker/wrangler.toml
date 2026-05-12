@@ -31,8 +31,24 @@ max_batch_size = 1
 max_batch_timeout = 5
 max_retries = 3
 
+# 60 requests/min/IP across all routes.
+[[unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
+
+# 10 POST /runs/min/IP. Run-creation is the expensive path; tighten it harder.
+[[unsafe.bindings]]
+name = "RL_RUNS"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 10, period = 60 }
+
 [vars]
-ALLOWED_ORIGIN = "https://getdebanked.xyz"
+ALLOWED_ORIGINS = "https://getdebanked.xyz"
+# OPERATOR_EMAILS = "you@example.com" — set per-env, comma-separated. Required
+# alongside the Cloudflare Access policy on getdebanked.xyz.
 
 # Secrets set via `wrangler secret put`:
 #   KALSHI_API_KEY_ID

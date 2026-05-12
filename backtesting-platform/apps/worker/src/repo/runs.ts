@@ -13,8 +13,41 @@ export interface RunListItem {
   finishedAt: string | null;
 }
 
-export async function createRun(db: D1Database, req: CreateRunRequest): Promise<Run> {
-  const id = crypto.randomUUID();
+export interface CreateRunAudit {
+  ip: string | null;
+  email: string | null;
+  idempotencyKeyHash: string | null;
+}
+
+export async function createRun(
+  db: D1Database,
+  req: CreateRunRequest,
+  audit: CreateRunAudit = { ip: null, email: null, idempotencyKeyHash: null },
+): Promise<Run> {
+  // Deterministic id when idempotency-key is provided so retries collapse.
+  const id = audit.idempotencyKeyHash != null
+    ? hashToUuid(audit.idempotencyKeyHash)
+    : crypto.randomUUID();
+
+  if (audit.idempotencyKeyHash != null) {
+    const existing = await db
+      .prepare(
+        `SELECT id, strategy_id as strategyId, symbol_id as symbolId, timeframe,
+                start_ts as startTs, end_ts as endTs, status, started_at as startedAt,
+                finished_at as finishedAt, config_json as configJson, metrics_json as metricsJson
+           FROM runs WHERE idempotency_key = ? LIMIT 1`,
+      )
+      .bind(audit.idempotencyKeyHash)
+      .first<RawRun>();
+    if (existing != null) {
+      return {
+        ...existing,
+        configJson: JSON.parse(existing.configJson),
+        metricsJson: existing.metricsJson ? JSON.parse(existing.metricsJson) : null,
+      } as Run;
+    }
+  }
+
   const strategyId = await upsertStrategy(db, req.config.strategy);
   const symbolId = await upsertSymbol(db, req.config.symbol, req.config.strategy.kind);
 
@@ -34,13 +67,33 @@ export async function createRun(db: D1Database, req: CreateRunRequest): Promise<
 
   await db
     .prepare(
-      `INSERT INTO runs (id, strategy_id, symbol_id, timeframe, start_ts, end_ts, status, config_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO runs (id, strategy_id, symbol_id, timeframe, start_ts, end_ts, status,
+                         config_json, created_by_ip, created_by_email, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(row.id, row.strategyId, row.symbolId, row.timeframe, row.startTs, row.endTs, row.status, JSON.stringify(row.configJson))
+    .bind(
+      row.id,
+      row.strategyId,
+      row.symbolId,
+      row.timeframe,
+      row.startTs,
+      row.endTs,
+      row.status,
+      JSON.stringify(row.configJson),
+      audit.ip,
+      audit.email,
+      audit.idempotencyKeyHash,
+    )
     .run();
 
   return row;
+}
+
+function hashToUuid(hex: string): string {
+  // Take 32 hex chars (16 bytes) and shape as a UUID v4 string so it satisfies
+  // the runId regex on the read path. Deterministic for the same idempotency key.
+  const h = hex.replace(/-/g, "").slice(0, 32).padEnd(32, "0");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
 
 export async function getRun(db: D1Database, id: string): Promise<Run | null> {

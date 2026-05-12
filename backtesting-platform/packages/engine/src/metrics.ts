@@ -171,18 +171,26 @@ export function computeRunMetrics(args: {
   const cagrPct = cagr(equityVals, args.startTs, args.endTs);
   const exposurePct =
     args.equity.length === 0 ? 0 : args.trades.length / args.equity.length;
+  // Belt-and-braces: every metric on this object lands in D1 as JSON and is
+  // re-parsed with zod (`RunMetrics.profitFactor: z.number()`). NaN and ±Inf
+  // both serialize to the literal `null`, which fails parse. profitFactor is
+  // already capped in tradeStats; everything else goes through `safeFinite`.
   return {
-    totalReturnPct,
-    cagrPct,
-    sharpe: sharpe(rets, ppy),
-    sortino: sortino(rets, ppy),
-    maxDrawdownPct: maxDd,
-    calmar: maxDd === 0 ? 0 : cagrPct / Math.abs(maxDd),
-    winRatePct: ts.winRatePct,
+    totalReturnPct: safeFinite(totalReturnPct),
+    cagrPct: safeFinite(cagrPct),
+    sharpe: safeFinite(sharpe(rets, ppy)),
+    sortino: safeFinite(sortino(rets, ppy)),
+    maxDrawdownPct: safeFinite(maxDd),
+    calmar: safeFinite(maxDd === 0 ? 0 : cagrPct / Math.abs(maxDd)),
+    winRatePct: safeFinite(ts.winRatePct),
     profitFactor: ts.profitFactor,
     tradeCount: args.trades.length,
-    avgWinPct: ts.avgWinPct,
-    avgLossPct: ts.avgLossPct,
-    exposurePct,
+    avgWinPct: safeFinite(ts.avgWinPct),
+    avgLossPct: safeFinite(ts.avgLossPct),
+    exposurePct: safeFinite(exposurePct),
   };
+}
+
+function safeFinite(n: number): number {
+  return Number.isFinite(n) ? n : 0;
 }

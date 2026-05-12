@@ -103,6 +103,28 @@ describe("tradeStats", () => {
 });
 
 describe("computeRunMetrics", () => {
+  test("no metric is NaN or ±Infinity even for a degenerate single-bar run", () => {
+    const equity: EquityPoint[] = [{ runId: "t", ts: 0, equity: 100_000, drawdown: 0 }];
+    const m = computeRunMetrics({
+      equity,
+      trades: [],
+      startTs: 0,
+      endTs: 0,
+      timeframe: "1h",
+      initialCashUsd: 100_000,
+    });
+    for (const [k, v] of Object.entries(m)) {
+      if (typeof v === "number") {
+        expect(Number.isFinite(v), `${k} should be finite, got ${v}`).toBe(true);
+      }
+    }
+    // Round-trip through JSON to assert no `null` substitution would happen.
+    const roundTripped = JSON.parse(JSON.stringify(m));
+    for (const v of Object.values(roundTripped)) {
+      expect(v).not.toBeNull();
+    }
+  });
+
   test("integrates end-to-end", () => {
     const SEC_YEAR = Math.floor(365.25 * 24 * 60 * 60);
     const equity: EquityPoint[] = [

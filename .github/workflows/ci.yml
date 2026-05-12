@@ -1,0 +1,46 @@
+name: backtesting-platform CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "backtesting-platform/**"
+      - ".github/workflows/ci.yml"
+
+defaults:
+  run:
+    working-directory: backtesting-platform
+
+jobs:
+  verify:
+    name: typecheck · test · build · audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: backtesting-platform/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (all packages)
+        run: pnpm -r typecheck
+
+      - name: Engine tests
+        run: pnpm --filter @bt/engine test
+
+      - name: Web build
+        run: pnpm --filter @bt/web build
+
+      - name: Audit (high+)
+        run: pnpm audit --prod --audit-level=high
+        continue-on-error: false
