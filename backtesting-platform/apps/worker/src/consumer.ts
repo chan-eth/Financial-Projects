@@ -35,27 +35,21 @@ async function runBacktest(env: Env, runId: string): Promise<void> {
   await markRunStatus(env.DB, runId, "running", { startedAt: new Date().toISOString() });
 
   const cfg = run.configJson;
-  const isKalshi = cfg.strategy.kind === "kalshi_15m";
+  const writeCheckpoint = async (cp: { cursorTs: number }) => {
+    await env.DATA.put(R2_PREFIX.runCheckpoint(runId, cp.cursorTs), JSON.stringify(cp));
+  };
 
-  if (isKalshi) {
-    const bars = streamKalshiEvents(env, run.symbolId, cfg.startTs, cfg.endTs);
-    const strat = kalshi15mBaseline(cfg.strategy);
-    const result = await runEngine<KalshiBarEvent>({
-      runId,
-      bars,
-      strategy: strat,
-      fees: { takerBps: 0, makerBps: 0, slippageBps: 0 },
-      initialCashUsd: cfg.initialCashUsd,
-      checkpointEveryNBars: 2_000,
-      onCheckpoint: (cp) =>
-        env.DATA.put(R2_PREFIX.runCheckpoint(runId, cp.cursorTs), JSON.stringify(cp)),
+  if (cfg.strategy.kind === "kalshi_15m") {
+    await markRunStatus(env.DB, runId, "failed", {
+      finishedAt: new Date().toISOString(),
+      metrics: { error: "kalshi consumer not wired in Phase 1 — run scripts/ingest-kalshi.ts then re-enable streamKalshiEvents" },
     });
-    await persistResult(env, runId, cfg.timeframe, cfg.startTs, cfg.endTs, cfg.initialCashUsd, result.equity, result.trades);
-    return;
+    throw new Error("kalshi consumer not wired yet — see scripts/ingest-kalshi.ts");
   }
 
+  const strategyParams = cfg.strategy;
   const bars = streamHyperliquidBars(env, cfg.symbol, cfg.timeframe, cfg.startTs, cfg.endTs);
-  const strat = hyperliquidBaseline(cfg.strategy);
+  const strat = hyperliquidBaseline(strategyParams);
   const result = await runEngine<Bar>({
     runId,
     bars,
@@ -63,8 +57,7 @@ async function runBacktest(env: Env, runId: string): Promise<void> {
     fees: HYPERLIQUID_FEES,
     initialCashUsd: cfg.initialCashUsd,
     checkpointEveryNBars: 5_000,
-    onCheckpoint: (cp) =>
-      env.DATA.put(R2_PREFIX.runCheckpoint(runId, cp.cursorTs), JSON.stringify(cp)),
+    onCheckpoint: writeCheckpoint,
   });
   await persistResult(env, runId, cfg.timeframe, cfg.startTs, cfg.endTs, cfg.initialCashUsd, result.equity, result.trades);
 }

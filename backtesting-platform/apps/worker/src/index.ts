@@ -39,6 +39,9 @@ export default {
 };
 
 function authorized(req: Request, env: Env): boolean {
+  // No WORKER_INTERNAL_SECRET set => open. Intended for `wrangler dev --local`
+  // only. Production must `wrangler secret put WORKER_INTERNAL_SECRET` so the
+  // Vercel proxy is the only client that gets past this gate.
   if (env.WORKER_INTERNAL_SECRET == null) return true;
   return req.headers.get("x-internal-secret") === env.WORKER_INTERNAL_SECRET;
 }

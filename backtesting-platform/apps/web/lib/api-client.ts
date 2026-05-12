@@ -1,5 +1,9 @@
 import type { CreateRunRequest, Run, TearsheetPayload } from "@bt/schemas";
 
+// Production sets NEXT_PUBLIC_API_BASE=https://api.getdebanked.xyz and the
+// browser talks to the Worker directly. The "/api/proxy" fallback is for local
+// dev (no Worker route) and routes through app/api/proxy/[...path]/route.ts,
+// which forwards server-side with the internal secret attached.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/proxy";
 
 export interface RunListItem {
