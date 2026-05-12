@@ -11,6 +11,9 @@ Below is the current layout of the repository. More folders and projects will be
 * **Compound Interest Calculator**
   A simple and extensible calculator for modeling compound interest over time. Useful for estimating investment growth, savings plans, long-term projections, and dollar-cost averaging scenarios.
 
+* **Backtesting Platform** (`backtesting-platform/`)
+  Interactive QuantConnect-style backtester for the Hyperliquid (perps + spot) and Kalshi 15-min crypto markets bots. pnpm monorepo: Next.js 16 UI on Vercel + Cloudflare Worker on D1/R2/Queues, with a shared TS engine that runs in both. Phase 1 ingests the last 70 days of data (the natural window for Kalshi crypto markets). See `backtesting-platform/README.md` for the deployment runbook.
+
 ## 🚀 Planned Additions
 
 This repository will expand with additional financial tools such as:
