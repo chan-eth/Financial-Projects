@@ -1,0 +1,41 @@
+name = "backtest-worker"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Production route binds api.getdebanked.xyz to this worker.
+routes = [
+  { pattern = "api.getdebanked.xyz/*", zone_name = "getdebanked.xyz" },
+]
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "backtest"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
+migrations_dir = "../../infra/d1/migrations"
+
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "backtest-data"
+
+[[queues.producers]]
+binding = "Q"
+queue = "backtest-jobs"
+
+[[queues.consumers]]
+queue = "backtest-jobs"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+
+[vars]
+ALLOWED_ORIGIN = "https://getdebanked.xyz"
+
+# Secrets set via `wrangler secret put`:
+#   KALSHI_API_KEY_ID
+#   KALSHI_PRIVATE_KEY_PEM
+#   CFBENCHMARKS_TOKEN
+#   WORKER_INTERNAL_SECRET
