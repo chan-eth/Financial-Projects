@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS runs (
   start_ts     INTEGER NOT NULL,
   end_ts       INTEGER NOT NULL,
   status       TEXT NOT NULL CHECK (status IN ('queued','running','succeeded','failed','canceled')),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
   started_at   TEXT,
   finished_at  TEXT,
   config_json  TEXT NOT NULL,
@@ -35,12 +36,13 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 CREATE INDEX IF NOT EXISTS runs_by_status ON runs(status, finished_at DESC);
 CREATE INDEX IF NOT EXISTS runs_by_strategy ON runs(strategy_id, finished_at DESC);
+CREATE INDEX IF NOT EXISTS runs_by_created ON runs(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS trades (
   id      TEXT PRIMARY KEY,
   run_id  TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   ts      INTEGER NOT NULL,
-  side    TEXT NOT NULL CHECK (side IN ('long','short','yes','no','close')),
+  side    TEXT NOT NULL CHECK (side IN ('long','short','yes','no')),
   qty     REAL NOT NULL,
   price   REAL NOT NULL,
   fee     REAL NOT NULL,

@@ -13,9 +13,14 @@ export const Timeframe = z.enum([
 ]);
 export type Timeframe = z.infer<typeof Timeframe>;
 
+// Symbols are used as R2 path components (`data/<venue>/<symbol>/...`).
+// Restrict to a safe character set so a malicious payload can't escape the
+// namespace via `../` or whitespace.
+export const SymbolString = z.string().regex(/^[A-Z0-9._-]+$/i).min(1).max(64);
+
 export const HyperliquidStrategyParams = z.object({
   kind: z.literal("hyperliquid"),
-  symbol: z.string(),
+  symbol: SymbolString,
   timeframe: Timeframe,
   fastEma: z.number().int().min(2).max(500).default(12),
   slowEma: z.number().int().min(5).max(1000).default(48),

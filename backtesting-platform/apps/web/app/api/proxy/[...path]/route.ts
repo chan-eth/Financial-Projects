@@ -2,7 +2,29 @@ import { NextResponse } from "next/server";
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "https://api.getdebanked.xyz";
 
+// Allowed origins for the proxy. Anything else is rejected — this is the CSRF
+// fence that prevents a malicious site from triggering authenticated calls via
+// the user's browser. Vercel preview deployments come in on *.vercel.app.
+function originAllowed(origin: string | null, host: string | null): boolean {
+  if (origin == null) return true; // same-origin / curl
+  try {
+    const u = new URL(origin);
+    if (u.hostname === "getdebanked.xyz") return true;
+    if (u.hostname.endsWith(".vercel.app")) return true;
+    if (host != null && u.host === host) return true; // localhost dev
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function forward(req: Request, params: { path: string[] }) {
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("host");
+  if (!originAllowed(origin, host)) {
+    return NextResponse.json({ error: "forbidden origin" }, { status: 403 });
+  }
+
   const path = "/" + (params.path?.join("/") ?? "");
   const url = new URL(req.url);
   const target = `${WORKER_BASE}${path}${url.search}`;

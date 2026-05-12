@@ -20,7 +20,9 @@ export async function handleRuns(req: Request, env: Env, url: URL): Promise<Resp
     return json({ runId: run.id, status: run.status }, 202);
   }
 
-  const idMatch = url.pathname.match(/^\/runs\/([^/]+)(?:\/(tearsheet|equity|trades))?$/);
+  const idMatch = url.pathname.match(
+    /^\/runs\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/(tearsheet|equity|trades))?$/i,
+  );
   if (idMatch && req.method === "GET") {
     const runId = idMatch[1]!;
     const sub = idMatch[2];

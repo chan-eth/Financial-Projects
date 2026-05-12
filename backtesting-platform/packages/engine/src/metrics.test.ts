@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  PROFIT_FACTOR_CAP,
   cagr,
   computeRunMetrics,
   maxDrawdown,
@@ -84,6 +85,20 @@ describe("tradeStats", () => {
     const s = tradeStats(trades);
     expect(s.winRatePct).toBeCloseTo(2 / 3, 6);
     expect(s.profitFactor).toBeCloseTo(30 / 5, 6);
+  });
+
+  test("profitFactor caps at PROFIT_FACTOR_CAP so JSON round-trip never produces null", () => {
+    // All wins, no losses: previously would have returned Infinity, which
+    // `JSON.stringify` turns into `null` and breaks RunMetrics.parse().
+    const trades: Trade[] = [
+      { id: "1", runId: "t", ts: 0, side: "long", qty: 1, price: 100, fee: 0, pnl: 10, reason: null },
+      { id: "2", runId: "t", ts: 0, side: "long", qty: 1, price: 100, fee: 0, pnl: 5, reason: null },
+    ];
+    const s = tradeStats(trades);
+    expect(s.profitFactor).toBe(PROFIT_FACTOR_CAP);
+    expect(Number.isFinite(s.profitFactor)).toBe(true);
+    const roundTripped = JSON.parse(JSON.stringify(s));
+    expect(roundTripped.profitFactor).toBe(PROFIT_FACTOR_CAP);
   });
 });
 

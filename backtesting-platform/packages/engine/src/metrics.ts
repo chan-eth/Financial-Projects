@@ -107,6 +107,11 @@ export function monthlyReturns(points: ReadonlyArray<EquityPoint>): MonthlyRetur
     }));
 }
 
+// Cap so JSON.stringify(profitFactor) is never the literal `null` that
+// `JSON.stringify(Infinity)` produces — D1 stores metrics as a JSON string and
+// the consumer round-trips them; an Infinity would violate `RunMetrics.profitFactor: z.number()`.
+export const PROFIT_FACTOR_CAP = 999;
+
 export function tradeStats(trades: ReadonlyArray<Trade>): {
   winRatePct: number;
   profitFactor: number;
@@ -117,9 +122,10 @@ export function tradeStats(trades: ReadonlyArray<Trade>): {
   const losses = trades.filter((t) => t.pnl < 0);
   const grossWin = wins.reduce((s, t) => s + t.pnl, 0);
   const grossLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
+  const profitFactor = grossLoss === 0 ? (grossWin > 0 ? PROFIT_FACTOR_CAP : 0) : grossWin / grossLoss;
   return {
     winRatePct: trades.length === 0 ? 0 : wins.length / trades.length,
-    profitFactor: grossLoss === 0 ? (grossWin > 0 ? Infinity : 0) : grossWin / grossLoss,
+    profitFactor: Math.min(profitFactor, PROFIT_FACTOR_CAP),
     avgWinPct: wins.length === 0 ? 0 : grossWin / wins.length,
     avgLossPct: losses.length === 0 ? 0 : -grossLoss / losses.length,
   };

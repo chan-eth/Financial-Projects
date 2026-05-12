@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const TradeSide = z.enum(["long", "short", "yes", "no", "close"]);
+export const TradeSide = z.enum(["long", "short", "yes", "no"]);
 export type TradeSide = z.infer<typeof TradeSide>;
 
 export const Trade = z.object({

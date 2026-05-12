@@ -2,14 +2,13 @@ import {
   HYPERLIQUID_FEES,
   computeRunMetrics,
   hyperliquidBaseline,
-  kalshi15mBaseline,
   monthlyReturns,
   rollingSharpe,
   periodsPerYearFromTimeframe,
   runEngine,
 } from "@bt/engine";
 import { R2_PREFIX, jsonlDecode, jsonlEncode, ymKey } from "@bt/data/r2-parquet";
-import type { Bar, KalshiBarEvent } from "@bt/engine";
+import type { Bar } from "@bt/engine";
 import type { EquityPoint, RunMetrics, TearsheetPayload, Trade } from "@bt/schemas";
 import type { Env, JobMessage } from "./env.js";
 import { getRun, markRunStatus } from "./repo/runs.js";
@@ -113,23 +112,6 @@ async function* streamHyperliquidBars(
       yield bar;
     }
   }
-}
-
-async function* streamKalshiEvents(
-  env: Env,
-  symbolId: string,
-  startTs: number,
-  endTs: number,
-): AsyncGenerator<KalshiBarEvent> {
-  void env;
-  void symbolId;
-  void startTs;
-  void endTs;
-  // Phase 1: implemented in scripts/seed-demo-run.ts which pre-populates R2.
-  // Worker streaming reads from R2 keys produced by ingest-kalshi + ingest-brti.
-  // Stubbed here to keep the consumer cross-compilable; wire concrete reader in
-  // the same shape as streamHyperliquidBars once ingest CLIs have run.
-  return;
 }
 
 function yearMonthsBetween(startTs: number, endTs: number): string[] {

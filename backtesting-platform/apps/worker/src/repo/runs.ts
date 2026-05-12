@@ -77,7 +77,7 @@ export async function listRuns(
        JOIN strategies s ON s.id = r.strategy_id
        JOIN symbols sym ON sym.id = r.symbol_id
        ${where}
-       ORDER BY COALESCE(r.finished_at, r.started_at, r.id) DESC
+       ORDER BY r.created_at DESC
        LIMIT ?`,
   );
   const bound = opts.strategyKind ? stmt.bind(opts.strategyKind, opts.limit) : stmt.bind(opts.limit);

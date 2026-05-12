@@ -67,7 +67,5 @@ function signedQty(fill: Fill): number {
     case "short":
     case "no":
       return -fill.qty;
-    case "close":
-      return 0;
   }
 }

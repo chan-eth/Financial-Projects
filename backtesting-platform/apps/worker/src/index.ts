@@ -14,11 +14,12 @@ export default {
     }
 
     const url = new URL(req.url);
+    const p = url.pathname;
     try {
-      if (url.pathname.startsWith("/runs")) return withCors(await handleRuns(req, env, url), cors);
-      if (url.pathname.startsWith("/strategies")) return withCors(await handleStrategies(req, env, url), cors);
-      if (url.pathname.startsWith("/ingest")) return withCors(await handleIngest(req, env, url), cors);
-      if (url.pathname === "/healthz") return withCors(json({ ok: true }), cors);
+      if (p === "/runs" || p.startsWith("/runs/")) return withCors(await handleRuns(req, env, url), cors);
+      if (p === "/strategies" || p.startsWith("/strategies/")) return withCors(await handleStrategies(req, env, url), cors);
+      if (p === "/ingest" || p.startsWith("/ingest/")) return withCors(await handleIngest(req, env, url), cors);
+      if (p === "/healthz") return withCors(json({ ok: true }), cors);
     } catch (err) {
       return withCors(json({ error: (err as Error).message }, 500), cors);
     }

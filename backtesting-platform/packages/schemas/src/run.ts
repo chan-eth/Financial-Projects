@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { StrategyParams, Timeframe } from "./strategy.js";
+import { StrategyParams, SymbolString, Timeframe } from "./strategy.js";
 
 export const RunStatus = z.enum([
   "queued",
@@ -10,15 +10,20 @@ export const RunStatus = z.enum([
 ]);
 export type RunStatus = z.infer<typeof RunStatus>;
 
-export const RunConfig = z.object({
-  strategy: StrategyParams,
-  symbol: z.string(),
-  timeframe: Timeframe,
-  startTs: z.number().int(),
-  endTs: z.number().int(),
-  initialCashUsd: z.number().positive().default(100_000),
-  benchmarkSymbol: z.string().optional(),
-});
+export const RunConfig = z
+  .object({
+    strategy: StrategyParams,
+    symbol: SymbolString,
+    timeframe: Timeframe,
+    startTs: z.number().int(),
+    endTs: z.number().int(),
+    initialCashUsd: z.number().positive().default(100_000),
+    benchmarkSymbol: SymbolString.optional(),
+  })
+  .refine((c) => c.startTs < c.endTs, {
+    message: "startTs must be strictly less than endTs",
+    path: ["endTs"],
+  });
 export type RunConfig = z.infer<typeof RunConfig>;
 
 export const RunMetrics = z.object({
