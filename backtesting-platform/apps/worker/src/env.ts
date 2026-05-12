@@ -1,8 +1,15 @@
+export interface RateLimiter {
+  limit(opts: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   DB: D1Database;
   DATA: R2Bucket;
   Q: Queue<JobMessage>;
-  ALLOWED_ORIGIN: string;
+  RL_GLOBAL: RateLimiter;
+  RL_RUNS: RateLimiter;
+  ALLOWED_ORIGINS: string;
+  OPERATOR_EMAILS?: string;
   KALSHI_API_KEY_ID?: string;
   KALSHI_PRIVATE_KEY_PEM?: string;
   CFBENCHMARKS_TOKEN?: string;

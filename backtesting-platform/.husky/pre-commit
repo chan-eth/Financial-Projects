@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Lightweight secret scan over staged files. Catches the obvious leaks before
+# they hit the remote. GitHub native push protection is the belt; this is the
+# braces.
+set -euo pipefail
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+# Patterns we never want to see committed.
+PATTERNS=(
+  # AWS
+  'AKIA[0-9A-Z]{16}'
+  'aws_secret_access_key[^=]*=[[:space:]]*[A-Za-z0-9/+=]{40}'
+  # GitHub
+  'gh[opsu]_[A-Za-z0-9]{30,}'
+  # Stripe
+  'sk_live_[0-9a-zA-Z]{24,}'
+  # PEM private keys
+  '-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----'
+  # Kalshi (project-specific)
+  'KALSHI_PRIVATE_KEY_PEM[^=]*=[[:space:]]*-+'
+)
+
+LEAKED=0
+for f in $STAGED; do
+  # Skip lockfiles and binary blobs.
+  case "$f" in
+    *pnpm-lock.yaml|*package-lock.json|*.png|*.jpg|*.jpeg|*.pdf|*.zip) continue ;;
+  esac
+  for p in "${PATTERNS[@]}"; do
+    if git diff --cached -U0 -- "$f" | grep -E -n "^\+" | grep -E -q "$p"; then
+      echo "pre-commit: potential secret matched /$p/ in $f" >&2
+      LEAKED=1
+    fi
+  done
+done
+
+if [ "$LEAKED" -ne 0 ]; then
+  echo "" >&2
+  echo "Refusing to commit. If this is a false positive, run \`git commit --no-verify\` (and explain why in the message)." >&2
+  exit 1
+fi
