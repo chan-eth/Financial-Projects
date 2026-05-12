@@ -12,7 +12,7 @@
     "ingest:kalshi": "tsx scripts/ingest-kalshi.ts",
     "ingest:brti": "tsx scripts/ingest-brti.ts",
     "seed:demo": "tsx scripts/seed-demo-run.ts",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
