@@ -1,0 +1,31 @@
+## Gradle
+.gradle/
+build/
+*/build/
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+## Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+captures/
+
+## Android
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+
+## Keystores — never commit
+*.jks
+*.keystore
+
+## Generated artifacts from cargo + UniFFI
+*.so
+app/src/main/jniLibs/

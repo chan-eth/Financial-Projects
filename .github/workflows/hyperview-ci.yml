@@ -1,0 +1,73 @@
+name: hyperview CI
+
+# Covers the HyperView paths that the backtesting-platform CI does not:
+#   - the shared docs in hyperview/
+#   - the web app in hyperview-web/
+#   - the native shells in hyperview-ios/ and hyperview-android/
+#   - the Rust HypeScript crate (inside the monorepo at
+#     backtesting-platform/packages/hypescript/) — TS workspace typecheck
+#     already runs in ci.yml; this workflow adds `cargo check` + `cargo audit`.
+#
+# The native shells are scaffold-only at M0 (no Xcode/Gradle projects yet);
+# real iOS/Android build jobs are wired in M3/M4.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "hyperview/**"
+      - "hyperview-web/**"
+      - "hyperview-ios/**"
+      - "hyperview-android/**"
+      - "backtesting-platform/packages/hypescript/**"
+      - ".github/workflows/hyperview-ci.yml"
+
+jobs:
+  hypescript-rust:
+    name: hypescript · cargo check + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backtesting-platform/packages/hypescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: cargo check
+        run: cargo check --all-targets
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --all
+
+  web-typecheck-build:
+    name: hyperview-web · typecheck + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hyperview-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: hyperview-web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Build
+        run: pnpm run build
+        env:
+          # No upstream API in CI; the home page route handler tolerates absent
+          # HYPERVIEW_API by falling back to Hyperliquid testnet at request time,
+          # and the home page is force-dynamic so the build does not fetch.
+          NEXT_TELEMETRY_DISABLED: "1"

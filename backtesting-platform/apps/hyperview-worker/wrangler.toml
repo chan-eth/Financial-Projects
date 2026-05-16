@@ -1,0 +1,143 @@
+# HyperView worker — Cloudflare Workers config.
+# Placeholder IDs at M0; filled in via `wrangler d1 create`,
+# `wrangler kv:namespace create`, `wrangler r2 bucket create` once
+# staging.hyperview.xyz DNS is provisioned. Never commit production
+# secrets here — use `wrangler secret put <NAME> --env <env>`.
+
+name = "hyperview-worker-dev"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+[observability]
+enabled = true
+
+# ---- local dev defaults ----
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hyperview-dev"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "hyperview-data-dev"
+
+[[kv_namespaces]]
+binding = "HV_CHALLENGES"
+id = "REPLACE_ME_AFTER_wrangler_kv_namespace_create"
+
+[[unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+[[unsafe.bindings]]
+name = "RL_ORDERS"
+type = "ratelimit"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:3000"
+HYPERLIQUID_API_BASE = "https://api.hyperliquid-testnet.xyz"
+RATE_LIMIT_GLOBAL_PER_MIN = "60"
+RATE_LIMIT_ORDERS_PER_MIN = "10"
+RP_ID = "localhost"
+RP_NAME = "HyperView (dev)"
+RP_ORIGIN = "http://localhost:3000"
+
+# Secrets (set per env via `wrangler secret put`):
+#   WORKER_INTERNAL_SECRET     — server-to-server auth from the Vercel proxy
+#   SESSION_SIGNING_SECRET     — HMAC key for JWT session tokens (>=32 chars)
+#   STRIPE_WEBHOOK_SECRET      — Stripe webhook signature verification
+#   REVENUECAT_WEBHOOK_SECRET  — RevenueCat webhook signature verification
+
+# -----------------------------------------------------------------------------
+# Staging
+# -----------------------------------------------------------------------------
+
+[env.staging]
+name = "hyperview-worker-staging"
+# routes = [{ pattern = "staging.api.hyperview.xyz/*", zone_name = "hyperview.xyz" }]
+
+[env.staging.vars]
+ALLOWED_ORIGINS = "https://staging.hyperview.xyz,http://localhost:3000"
+HYPERLIQUID_API_BASE = "https://api.hyperliquid-testnet.xyz"
+RATE_LIMIT_GLOBAL_PER_MIN = "60"
+RATE_LIMIT_ORDERS_PER_MIN = "10"
+RP_ID = "staging.hyperview.xyz"
+RP_NAME = "HyperView (staging)"
+RP_ORIGIN = "https://staging.hyperview.xyz"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "hyperview-staging"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
+
+[[env.staging.r2_buckets]]
+binding = "DATA"
+bucket_name = "hyperview-data-staging"
+
+[[env.staging.kv_namespaces]]
+binding = "HV_CHALLENGES"
+id = "REPLACE_ME_AFTER_wrangler_kv_namespace_create"
+
+[[env.staging.unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.unsafe.bindings]]
+name = "RL_ORDERS"
+type = "ratelimit"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }
+
+# -----------------------------------------------------------------------------
+# Production
+# -----------------------------------------------------------------------------
+
+[env.production]
+name = "hyperview-worker"
+# routes = [{ pattern = "api.hyperview.xyz/*", zone_name = "hyperview.xyz" }]
+
+[env.production.vars]
+ALLOWED_ORIGINS = "https://hyperview.xyz"
+HYPERLIQUID_API_BASE = "https://api.hyperliquid.xyz"
+RATE_LIMIT_GLOBAL_PER_MIN = "60"
+RATE_LIMIT_ORDERS_PER_MIN = "10"
+RP_ID = "hyperview.xyz"
+RP_NAME = "HyperView"
+RP_ORIGIN = "https://hyperview.xyz"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "hyperview"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
+
+[[env.production.r2_buckets]]
+binding = "DATA"
+bucket_name = "hyperview-data"
+
+[[env.production.kv_namespaces]]
+binding = "HV_CHALLENGES"
+id = "REPLACE_ME_AFTER_wrangler_kv_namespace_create"
+
+[[env.production.unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+[[env.production.unsafe.bindings]]
+name = "RL_ORDERS"
+type = "ratelimit"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }

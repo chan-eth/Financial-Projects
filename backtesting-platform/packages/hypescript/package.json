@@ -1,0 +1,13 @@
+{
+  "name": "@hv/hypescript",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TS wrapper that re-exports the compiled HypeScript WASM module. Real build wired in M1.",
+  "type": "module",
+  "scripts": {
+    "build": "echo 'M0 scaffold — wasm-pack build pending'",
+    "test": "echo 'M0 scaffold — cargo test pending'",
+    "typecheck": "echo 'M0 scaffold — TS surface lands in M1'",
+    "lint": "echo 'M0 scaffold — lint pending'"
+  }
+}

@@ -14,6 +14,9 @@ Below is the current layout of the repository. More folders and projects will be
 * **Backtesting Platform** (`backtesting-platform/`)
   Interactive QuantConnect-style backtester for the Hyperliquid (perps + spot) and Kalshi 15-min crypto markets bots. pnpm monorepo: Next.js 16 UI on Vercel + Cloudflare Worker on D1/R2/Queues, with a shared TS engine that runs in both. Phase 1 ingests the last 70 days of data (the natural window for Kalshi crypto markets). See `backtesting-platform/README.md` for the deployment runbook.
 
+* **HyperView** (`hyperview/`, `hyperview-web/`, `hyperview-ios/`, `hyperview-android/`, `backtesting-platform/apps/hyperview-worker/`, `backtesting-platform/packages/{hypescript,hv-schemas,hv-charts,hv-trading}/`)
+  Hyperliquid-native charting and trading platform shipping on web, iOS, and Android, with an original embedded scripting language called HypeScript (series-first, sandboxed, compiled in Rust to WASM + native libs). Self-custody trading with optional sub-account abstraction. Day-1 monetization (ads + premium tiers via RevenueCat/Stripe). Currently at M0 — scaffolding only. See [`hyperview/PLAN.md`](hyperview/PLAN.md) for the full implementation plan and milestones M0–M6, and [`hyperview/docs/HYPESCRIPT.md`](hyperview/docs/HYPESCRIPT.md) for the language identity.
+
 ## 🚀 Planned Additions
 
 This repository will expand with additional financial tools such as:
