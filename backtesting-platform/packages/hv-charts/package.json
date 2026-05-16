@@ -1,0 +1,13 @@
+{
+  "name": "@hv/charts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "echo 'M0 scaffold — tsc --noEmit pending'",
+    "lint": "echo 'M0 scaffold — lint pending'",
+    "test": "echo 'M0 scaffold — vitest pending'"
+  }
+}

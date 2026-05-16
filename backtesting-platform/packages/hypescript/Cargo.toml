@@ -1,0 +1,17 @@
+[package]
+name = "hypescript"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "HypeScript compiler and VM. Series-first scripting language for Hyperliquid-native indicators, strategies, and screeners."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+
+[dev-dependencies]
+
+# Targets and UniFFI dependencies wired in M1; left empty at M0 so `cargo check`
+# succeeds in CI without pulling unrelated downloads.

@@ -19,9 +19,13 @@ In scope:
 
 - `backtesting-platform/` (the Next.js UI, the Cloudflare Worker, the shared
   TypeScript packages, the ingest scripts, the D1 migrations, the wrangler
-  configuration).
+  configuration). This includes the HyperView worker and packages that live
+  inside this monorepo: `apps/hyperview-worker/`,
+  `packages/{hypescript,hv-schemas,hv-charts,hv-trading}/`.
+- `hyperview/`, `hyperview-web/`, `hyperview-ios/`, `hyperview-android/`.
 - The deployed services at `getdebanked.xyz` and `api.getdebanked.xyz` once
-  they go live.
+  they go live, and `hyperview.xyz` + `api.hyperview.xyz` + `play.hyperview.xyz`
+  + `hypescript.dev` once provisioned.
 - The CI / Dependabot configuration under `.github/`.
 
 Out of scope:
@@ -36,6 +40,12 @@ The defenses currently in place are documented in
 That section also lists the gaps we know about but haven't closed yet (audit-
 log retention/export, per-user resource quotas, staging environment isolation
 beyond bindings).
+
+HyperView extends, but does not replace, that model. The delta (mobile cert
+pinning, App Attest / Play Integrity on trading endpoints, biometric-gated
+secp256k1 trading key, per-user rate limits, HypeScript VM sandboxing,
+Scriptshop supply-chain review, geo-block posture) is documented in
+[`hyperview/docs/SECURITY.md`](hyperview/docs/SECURITY.md).
 
 ## What to expect
 

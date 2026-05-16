@@ -1,0 +1,14 @@
+{
+  "name": "@hv/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'M0 scaffold — wrangler dev pending'",
+    "build": "echo 'M0 scaffold — esbuild bundle pending'",
+    "typecheck": "echo 'M0 scaffold — typecheck pending'",
+    "lint": "echo 'M0 scaffold — lint pending'",
+    "deploy:staging": "echo 'wrangler deploy --env staging — wired in M0 follow-up'",
+    "deploy:production": "echo 'wrangler deploy --env production — wired in M0 follow-up'"
+  }
+}

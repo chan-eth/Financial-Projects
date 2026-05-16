@@ -13,6 +13,32 @@ updates:
       - dependency-name: "*"
         update-types: [version-update:semver-major]
 
+  - package-ecosystem: npm
+    directory: /hyperview-web
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      hyperview-web-deps:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: cargo
+    directory: /backtesting-platform/packages/hypescript
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      hypescript-deps:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -1,0 +1,13 @@
+{
+  "name": "@hv/schemas",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "echo 'M0 scaffold — tsc --noEmit pending once src is real'",
+    "lint": "echo 'M0 scaffold — lint pending'",
+    "test": "echo 'M0 scaffold — vitest pending'"
+  }
+}
