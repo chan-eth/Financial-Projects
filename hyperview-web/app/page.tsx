@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { BTCPriceChart } from "@/components/BTCPriceChart";
 import { fetchCandles } from "@/lib/marketServer";
+import { getCurrentUser } from "@/lib/authServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,6 +22,8 @@ export default async function HomePage() {
     fetchError = String(err);
   }
 
+  const me = await getCurrentUser();
+
   return (
     <main className="min-h-dvh flex flex-col gap-6 px-6 py-10 max-w-6xl mx-auto">
       <header className="flex items-baseline justify-between gap-4">
@@ -29,13 +33,35 @@ export default async function HomePage() {
             Hyperliquid-native charting and trading · M0 preview
           </p>
         </div>
-        <div className="text-right text-sm text-neutral-500">
+        <nav className="flex items-center gap-4 text-sm">
+          {me ? (
+            <Link href="/account" className="text-neutral-300 hover:text-white">
+              {me.user.displayName ?? me.user.primaryAddress.slice(0, 8) + "…"}
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="text-neutral-400 hover:text-white">
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="rounded-md bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-900 hover:bg-white"
+              >
+                Create passkey
+              </Link>
+            </>
+          )}
+        </nav>
+      </header>
+
+      <div className="flex items-baseline justify-end text-sm text-neutral-500">
+        <div className="text-right">
           <div className="font-mono uppercase tracking-wider">
             {SYMBOL} · {TIMEFRAME}
           </div>
           <div className="text-xs">last 30 days · polled every 15s</div>
         </div>
-      </header>
+      </div>
 
       {fetchError ? (
         <div className="rounded-lg border border-red-900 bg-red-950/40 p-4 text-sm text-red-200">
