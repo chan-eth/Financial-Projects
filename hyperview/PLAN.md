@@ -259,3 +259,269 @@ At each subsequent milestone, the gate (§9) is the verification. Additionally:
 7. **US regulatory** — even self-custody + ads + premium may trip state MTL or commodity-broker classifications. Counsel required before M5.
 8. **Disaster recovery / SLOs** — what happens when D1 has a 4h outage and an alert misses a 10% move? Need SLO doc and out-of-band fallback (push trigger from second region) before M6.
 9. **Talent risk** — Rust compiler + Metal + Skia/Compose + Hyperliquid SDK = 4 specialists. Below this headcount, timeline doubles.
+
+---
+
+## 12. M1 — HypeScript v0: detailed design
+
+This section locks the M1 build down to something a Rust engineer can execute against without further design rounds. It is informed by exploration of the existing `@bt/engine` (M0's first audit segment found a strict bar/series contract HypeScript must match: `Bar = {ts:seconds, open, high, low, close, volume}`, `Strategy.onBar(bar, ctx) → Order[]`, all numbers `f64`, fee math at BPS = 10_000, `TradeSide = "long"|"short"|"yes"|"no"`, history ring of last 2048 closes).
+
+### 12.1 Surface syntax (EBNF sketch)
+
+```ebnf
+script        = "hype" kind STRING "{" manifest decl* "}" ;
+kind          = "indicator" | "strategy" | "screener" ;
+
+manifest      = [ "uses"   capability { "," capability } ";" ]
+                [ "emits"  emit       { "," emit       } ";" ]
+                [ "params" "{" param_decl* "}" ] ;
+capability    = "series" "." IDENT | "hl" "." IDENT [ "." IDENT ]
+              | "chart" | "alert" | "trade" ;
+emit          = "signal" | "alert" | "order" ;
+param_decl    = IDENT ":" type "=" literal ";" ;
+
+decl          = import_decl | let_decl | when_decl
+              | event_decl | trade_decl | cooldown_decl
+              | plot_stmt | if_stmt ;
+
+import_decl   = "from" "house" "." ns_path "import" IDENT { "," IDENT } ";" ;
+let_decl      = "let" IDENT [ ":" type ] "=" expr ";" ;
+when_decl     = "when" expr ":" block ;
+event_decl    = ("purr"|"hiss") "when" expr [ "tag" STRING ] ";" ;
+trade_decl    = "pounce" side "size" "=" expr "when" expr [ "reason" STRING ] ";" ;
+cooldown_decl = "nap" INT "bars" "after" "pounce" ";" ;
+
+expr          = ternary ;
+ternary       = logic_or [ "?" expr ":" expr ] ;
+logic_or      = logic_and { "||" logic_and } ;
+logic_and     = cross    { "&&" cross } ;
+cross         = compare  { ("crosses" "above" | "crosses" "below") compare } ;
+compare       = add      { ("<"|"<="|">"|">="|"=="|"!=") add } ;
+add           = mul      { ("+"|"-") mul } ;
+mul           = unary    { ("*"|"/"|"%") unary } ;
+unary         = ("-"|"!") unary | postfix ;
+postfix       = primary { "[" expr "]" | "." IDENT | "(" arg_list ")" } ;
+primary       = NUMBER | STRING | BOOL | IDENT | "(" expr ")" ;
+type          = "int" | "float" | "bool" | "string" | "bar"
+              | "timeframe" | "tradeside" | "series" "<" type ">" ;
+```
+
+Open lexer/parser notes: `crosses above`/`crosses below` is a 2-token operator (lexer emits `KW_CROSSES`; parser peeks for `above`/`below` → `HV103` diagnostic if neither). `bars` and `after` in `nap N bars after pounce` are contextual, not globally reserved. Named arguments (`color="cyan"`) require positional args first.
+
+### 12.2 Type system
+
+| Type | Repr | Notes |
+|---|---|---|
+| `int`, `float` | `f64` | No runtime distinction; sema rejects fractional literals where `int` required. |
+| `bool` | `u8` in VM, `boolean` over FFI | |
+| `string` | UTF-8, interned in constant pool. No concat in v0. | |
+| `bar` | record, read-only | `bar.open`, `bar.close`, etc. — not user-constructible. |
+| `timeframe`, `tradeside` | enums | `1m|5m|15m|1h|4h|1d`; `long|short|flat|yes|no`. |
+| `series<T>` | abstract rank-1 | Only `int`/`float`/`bool` inside in v0. |
+| `signal`, `order` | built-in records | Emitted by `purr`/`hiss`/`pounce`; never user-constructed. |
+
+**Series-rank inference** (every AST node carries `(BaseTy, Rank)`):
+1. Literals → rank 0.
+2. `hl.market.{close,open,high,low,volume}` → rank 1.
+3. Binop `a op b`: matched ranks pass through; rank-0 ⊕ rank-1 broadcasts → rank 1.
+4. Lookback `s[k]` requires `s: series<T>` and `k` constant-folded `int >= 0` (dynamic lookback deferred to v0.1). Result: rank 1.
+5. Stdlib functions declare per-arg rank requirements (see §12.5).
+6. `crosses above`/`crosses below` requires both sides `series<float>` after broadcast; result `series<bool>`.
+
+**Effects and capabilities.** Stdlib fns are tagged with an effect row at the Rust level (e.g. `hl.market.close` → `reads(series.close)`). Sema collects the transitive set used by the script and intersects with the manifest. Used-but-undeclared → `HV241` error. Declared-but-unused → `HV242` warning.
+
+v0 simplifications: no user-defined generics, no user effect rows, no user modules, no first-class functions. Stdlib is the only callable surface.
+
+### 12.3 Intermediate representation
+
+Typed SSA with these op shapes:
+
+```rust
+struct Function   { params: Vec<Value>, blocks: Vec<BasicBlock>, ret_ty: Ty }
+struct BasicBlock { id: BlockId, ops: Vec<Op>, term: Terminator }
+enum  OpKind {
+  Const(ConstId), Binary(BinOp, Value, Value), Unary(UnOp, Value),
+  SeriesLoad { source: SeriesId, offset: i32 },   // e.g. close[3]
+  SeriesStream { stream: StreamId },              // current value of an ema/rsi/...
+  CallStdlib { fn_id: StdlibFn, args: Vec<Value> },
+  EmitSignal { kind: PurrOrHiss, cond: Value, tag: ConstId },
+  EmitOrder  { side: TradeSide, qty: Value, cond: Value, reason: ConstId },
+  Plot       { name: ConstId, value: Value, color: Option<ConstId> },
+  CooldownGate { remaining: StreamId },
+}
+```
+
+**v0 passes** (in order): constant folding → dead-code elimination → **series fusion** (collapses `ta.sma(ta.ema(close,12),9)` into one per-bar update by topologically sorting the dataflow graph of stream/series ops and lifting all pointwise-pure descendants into a single fused tail block) → **lookback-window analysis** (max constant offset per series → VM ring-buffer sizing) → defensive capability re-check (panics if violated — internal invariant, not user error).
+
+### 12.4 Bytecode + VM
+
+Stack VM, **45 opcodes** (real count, room in the 1-byte space for v1 growth). One-byte opcode + variable-length immediates (`i16` rel jumps, `u8`/`u16` indices). Constant pool holds f64 literals, interned strings, and enum tags.
+
+Grouped opcode list:
+- **Constants / locals (6):** `CONST_F64`, `CONST_BOOL`, `CONST_STR`, `LOAD_LOCAL`, `STORE_LOCAL`, `POP`.
+- **Arithmetic (6):** `ADD`, `SUB`, `MUL`, `DIV`, `MOD`, `NEG`.
+- **Comparison + logic (9):** `EQ`, `NE`, `LT`, `LE`, `GT`, `GE`, `AND`, `OR`, `NOT`.
+- **Series (6):** `SLOAD series, offset`, `SPUSH series`, `STREAM_READ stream`, `STREAM_STEP stream, fn_id`, `CROSS_ABOVE`, `CROSS_BELOW`.
+- **Control flow (5):** `JMP rel`, `JMP_IF_FALSE rel`, `CALL_STDLIB fn_id, argc`, `RET`, `HALT`.
+- **Bar accessors (6):** `BAR_OPEN`, `BAR_HIGH`, `BAR_LOW`, `BAR_CLOSE`, `BAR_VOL`, `BAR_TS`.
+- **Emission (5):** `PLOT name, color`, `EMIT_PURR tag`, `EMIT_HISS tag`, `EMIT_ORDER side, reason`, `COOLDOWN_GATE slot, bars`.
+- **Utility (3):** `TO_BOOL`, `TO_F64`, `DUP`.
+
+**Gas counter:** `u32`, decremented per opcode. Costs — cheap (1) for arithmetic/locals/bar/jumps, medium (4) for `DIV`, `SLOAD`/`SPUSH`, `STREAM_READ`, `CROSS_*`, heavy (16) for `STREAM_STEP`, `CALL_STDLIB`, `EMIT_*`, `PLOT`. Limit **65,536 per bar**; exhaustion → `VmError::GasExhausted` surfaced as a runtime `Diagnostic`, not a panic.
+
+**Heap:** fixed 16 MiB slab. All allocation happens at script load (constant pool + ring buffers sized by lookback analysis + stream cells). **Zero per-bar allocation** — this is what makes the 200ms CPU budget trivial.
+
+**`.hvb` container:**
+
+```
+0    4   magic "HVB\0"
+4    1   version (= 1)
+5    1   flags (bit0 strategy, bit1 indicator, bit2 screener)
+6    2   manifest_len
+8    M   manifest (CBOR: uses, emits, params, source_name)
+…    2   const_pool_count + entries (u8 tag + payload)
+…    4   fn_table_count + entries (name_idx, code_offset, code_len, lookback)
+…    4   code_section_len + raw bytecode
+…   32   blake3 hash of all preceding bytes (integrity + cache key)
+```
+
+Target size: <50 KB per non-trivial script.
+
+### 12.5 Stdlib v0 — exact signatures (30 functions + 5 series accessors)
+
+Kinds: **(P)** pure scalar, **(E)** elementwise, **(S)** stateful streaming.
+
+**`ta`** (10, all streaming):
+- `sma(src: series<float>, period: int) -> series<float>` — simple MA.
+- `ema(src: series<float>, period: int) -> series<float>` — `k = 2/(period+1)`. Must be bit-exact vs `engine/src/strategies/hyperliquid-baseline.ts:ema` (differential test in §12.8).
+- `wma(src: series<float>, period: int) -> series<float>` — linear-weighted.
+- `rsi(src: series<float>, period: int) -> series<float>` — Wilder's smoothing.
+- `atr(period: int) -> series<float>` — Wilder ATR on HL + prev close.
+- `macd(src: series<float>, fast: int, slow: int, signal: int) -> series<float>` — returns histogram (MACD − signal).
+- `bbands_upper(src: series<float>, period: int, mult: float) -> series<float>`.
+- `bbands_lower(src: series<float>, period: int, mult: float) -> series<float>` — split into two functions to avoid multi-return in v0.
+- `stoch(period: int, smooth_k: int) -> series<float>` — smoothed %K.
+- `vwap() -> series<float>` — session VWAP; first session starts at bar 0, rolls on UTC midnight thereafter.
+
+**`math`** (10, all pure scalar): `abs`, `min`, `max`, `clamp`, `round`, `floor`, `ceil`, `log`, `sqrt`, `pow`. (Rolling stats live in `series`.)
+
+**`series`** (6): `shift(s, n)`, `change(s)` = `s − s[1]`, `highest(s, n)`, `lowest(s, n)`, `mean(s, n)`, `stddev(s, n)`. Cleanly punt `fill_na`, `slice`, `since` to v0.1.
+
+**`hl.market`** (4 fn + 5 accessors): `bar_time()`, `bar_index()`, plus accessors `close`, `open`, `high`, `low`, `volume` (typed `series<float>`, compile to `BAR_*` + `SPUSH` not function calls). `price` is an alias for `close`.
+
+`hl.derivs`, `hl.book`, `hl.vault`, `chart`, `alert`, `trade`, `risk`, `signal` are **reserved namespaces** — the lexer/parser recognizes them, sema emits `HV322: namespace 'hl.derivs' is reserved; available in v0.2` to give a useful error rather than "unknown identifier."
+
+### 12.6 Compile-target mapping to `@bt/engine`
+
+Rust crate exposes three FFI entry points (UniFFI IDL + `wasm_bindgen` for web). Shared types match the engine's existing TS contracts byte-for-byte:
+
+```idl
+dictionary HvBar       { i64 ts_seconds; f64 open; f64 high; f64 low; f64 close; f64 volume; };
+dictionary HvCtx       { f64 equity; f64 position; f64 avg_entry; f64 cash; sequence<f64> history; };
+dictionary HvPlot      { string name; f64 value; string? color; };
+dictionary HvSignal    { string kind; string tag; i64 ts; };       // kind = "purr" | "hiss"
+dictionary HvOrder     { string side; f64 qty; f64? limit_price; string? reason; };
+dictionary HvIndicatorResult { sequence<HvPlot> plots; sequence<HvSignal> signals; };
+dictionary HvStrategyResult  { sequence<HvOrder> orders; sequence<HvSignal> signals; };
+
+interface HvModule {
+  constructor(bytes bytecode);
+  string name(); string kind();
+  HvIndicatorResult run_indicator_bar(HvBar, HvCtx);
+  HvStrategyResult  run_strategy_bar (HvBar, HvCtx);
+  sequence<string>  run_screener     (sequence<string> symbols,
+                                      record<string, sequence<HvBar>> bars);
+  bytes checkpoint(); void restore(bytes);
+};
+```
+
+- **`hype indicator`** → `(bar, ctx) → {plots, signals}`. No `EmitOrder` op in its fn table. Consumed by `@hv/charts` (plots) and the alerts engine (signals).
+- **`hype strategy`** → an object matching engine `Strategy<Bar>` via a thin TS adapter `wrapHypeStrategy(module): Strategy<Bar>` in `packages/hypescript/src-ts/wrap.ts`. The adapter:
+  - Sets `name` from the `hype strategy "Name"` literal.
+  - On `onBar(bar, ctx)`, calls `module.run_strategy_bar(bar, ctx)`, returns `out.orders`. Signals dispatched on a separate channel.
+  - `nap N bars after pounce` lives in a VM cooldown stream cell, serialized into `module.checkpoint()`.
+- **`hype screener`** → host calls `run_screener(symbols, bars)` at the screener UI's cadence (no per-bar opcodes in the VM for multi-symbol scans).
+
+### 12.7 Compiler diagnostics
+
+```rust
+struct Diagnostic {
+  severity: Severity,         // Error | Warning | Note
+  code: DiagCode,             // "HV203"
+  message: String,
+  primary_span: Span,
+  secondary: Vec<(Span, String)>,
+  suggestions: Vec<Fix>,
+}
+```
+
+Code prefixes: `HV0xx` internal (panic-handler fallback only), `HV1xx` lexer, `HV2xx` parser, `HV3xx` sema, `HV4xx` IR/passes, `HV5xx` codegen/linker.
+
+`compile()` returns `Result<CompiledModule, Vec<Diagnostic>>` — **no user-input path may panic.** Internal invariant violations panic (caught by the host as `HV0xx`). Same `Diagnostic` shape maps 1:1 to LSP `Diagnostic`.
+
+### 12.8 Test plan + audit gate
+
+1. **Unit (per-stage Rust tests):** lexer/parser snapshot tests via `insta`; sema error matrix; IR pass behavior; VM micro-tests (gas, stack, ring buffers).
+2. **Golden bytecode:** `tests/golden/*.hype` → `tests/golden/*.hvb.snapshot`; regenerate with `cargo insta review`.
+3. **Synthetic-bar integration:** 5000 deterministic bars (sin + noise) → run compiled `.hype` → assert plots/signals/orders.
+4. **Differential `ta.ema`:** identical 5000-bar close vector through both HypeScript VM and a port of the engine's `ema` from `packages/engine/src/strategies/hyperliquid-baseline.ts`. Assert elementwise equality within `1e-12`.
+5. **Smoke fuzzer:** `cargo-fuzz` target feeds random bytes to lexer + parser; no panic paths.
+
+**M1 audit gate coverage targets:** VM 60% lines, stdlib 70% lines, enforced via `cargo llvm-cov --fail-under-lines`. Other three gate checks (static / security / red-team) per §9.
+
+### 12.9 Tooling for M1
+
+- **`hypec` CLI** (`packages/hypescript/src/bin/hypec.rs`): `check`, `compile`, `run --fixture`, `dump --ir|--bc|--manifest`. JSON diagnostics mode (`--format=json`) for non-LSP editor plugins.
+- **`hype-lsp`** (`packages/hypescript/src/bin/hype-lsp.rs`) via `tower-lsp`: hover, goto-def (stdlib defs surfaced as `hypelib://ta/ema` virtual URIs), diagnostics (150ms debounce), completion. Rename + refactor deferred to v1.1.
+- **Tree-sitter grammar** (`packages/hypescript/grammar/tree-sitter-hypescript/`): highlighting only; compiler keeps its own hand-rolled parser for better error recovery. Shipped as a separate npm artifact for VS Code / Cursor / Zed.
+- **Web playground** (`play.hyperview.xyz`): WASM compiler in-page, Monaco editor with tree-sitter highlight, bundled fixture `fixtures/btc-1h-1000.json` (~80 KB, generated synthetic), renders `chart.plot` via `@hv/charts`. **M1 success criterion:** `examples/rsi.hype` compiles in-page and renders an RSI line matching a known-good snapshot.
+
+### 12.10 Decisions locked here (resolves M1 design's eight open questions)
+
+1. **`chart.plot` channel:** per-bar buffer returned from `run_indicator_bar`. Stateless across bars. No callback.
+2. **`purr`/`hiss` across kinds:** universal across indicator/strategy/screener. Alert wiring is host-side; the language doesn't distinguish.
+3. **Reserved namespaces:** `hl.derivs`, `hl.book`, `hl.vault`, `chart`, `alert`, `trade`, `risk`, `signal` are lexer-recognized; sema rejects with `HV322: available in v0.2`.
+4. **`nap`:** blocks *all* subsequent pounces for N bars (not just same-side). One global cooldown cell per strategy in v0.
+5. **Strategy VM state in engine checkpoint:** extend `EngineCheckpoint` (defined in `backtesting-platform/packages/engine/src/types.ts`) with optional `stratState?: Uint8Array`. The engine treats the blob opaquely; HypeScript's strategy wrapper writes it via `module.checkpoint()` on each checkpoint tick and reads it via `module.restore()` on resume. Existing TS strategies are unaffected (the field is optional). `runEngine` in `loop.ts` threads the blob through alongside the existing portfolio fields.
+6. **Indicator return shape:** flat `{name, value, color?}` entries. Multiple plots per bar = multiple entries.
+7. **Screener cadence:** host orchestrates. VM exposes `run_screener` per call. No multi-symbol opcodes.
+8. **`vwap` determinism:** first session begins at bar 0; rolls on UTC midnight from bar 0's date onward.
+
+### 12.11 Critical files to modify in M1
+
+- `backtesting-platform/packages/hypescript/Cargo.toml` — add dependencies (`uniffi`, `wasm-bindgen`, `serde`, `serde_cbor`, `blake3`, `tower-lsp`, `insta` dev-dep).
+- `backtesting-platform/packages/hypescript/src/lib.rs` — public surface `compile()` + `HvModule`.
+- `backtesting-platform/packages/hypescript/src/{lexer,parser,ast,sema,ir,pass,codegen,vm,stdlib}/` — new module tree.
+- `backtesting-platform/packages/hypescript/src/bin/{hypec,hype-lsp}.rs` — CLI + LSP binaries.
+- `backtesting-platform/packages/hypescript/src/uniffi.udl` — FFI IDL.
+- `backtesting-platform/packages/hypescript/src-ts/wrap.ts` — TS adapter exposing `wrapHypeStrategy`, `wrapHypeIndicator`, `wrapHypeScreener`.
+- `backtesting-platform/packages/hypescript/tests/{golden,integration,diff,unit}/` — test trees.
+- `hyperview/docs/HYPESCRIPT.md` — update with the locked grammar + stdlib signatures once M1 lands.
+- `.github/workflows/hyperview-ci.yml` — add `cargo llvm-cov --fail-under-lines 60` for `vm/`, `--fail-under-lines 70` for `stdlib/`.
+- `backtesting-platform/packages/engine/src/types.ts` — add optional `stratState?: Uint8Array` to `EngineCheckpoint` per §12.10.5.
+- `backtesting-platform/packages/engine/src/loop.ts` — thread `stratState` through `runEngine` alongside the existing portfolio fields.
+
+---
+
+## 13. Branch and PR strategy
+
+Per-milestone branches off `main`, each landing a single PR through the audit gate (§9). Concretely:
+
+- `claude/hyperview-trading-app-Rimyc` is the **M0** branch (current PR #8). Stays open as the M0 deliverable; squash-merges to `main` once the gate passes. Tagged `hyperview-m0-YYYY-MM-DD` at merge.
+- `claude/hyperview-m1-hypescript-v0` cuts from `main` after M0 lands; carries the M1 work; opens its own PR; runs its own audit gate; merges; tagged.
+- Same shape for M2 web MVP, M3 iOS, M4 Android, M5 trading, M6 launch.
+
+Naming convention: `claude/hyperview-m{N}-{short-slug}`. Tags: `hyperview-m{N}-{YYYY-MM-DD}`.
+
+Why per-milestone instead of one rolling branch: gate signal is preserved per merge (you can bisect to a known-good audit point if a later milestone regresses something earlier), reviewers can hold milestone PRs to a tight scope, and the audit gate has a clear merge-decision moment instead of being a checkpoint annotation on a moving branch.
+
+The user's original branch instruction (`claude/hyperview-trading-app-Rimyc`) is preserved for M0; M1+ branches will follow the convention above. If you'd prefer a single long-lived branch instead, say so before M0 merges and we'll fold M1 onto it.
+
+---
+
+## 14. Next steps after M1 detail is approved
+
+1. Wait for PR #8 CI to finish; address any failures.
+2. Run the M0 audit gate per §9 (a short red-team review of the scaffold makes sense even though there's almost no logic).
+3. Merge PR #8 to `main`; tag `hyperview-m0-2026-05-16`.
+4. Branch `claude/hyperview-m1-hypescript-v0` from `main`. Execute M1 against §12. Estimated 6 weeks per the milestones table; the first commit should be the dependency wiring in `Cargo.toml` and the lexer module shell, plus a stub differential test for `ta.ema` (it will be skipped until the VM is real, but the test exists from day 1 so we never lose sight of the bit-exact contract).
