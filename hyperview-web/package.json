@@ -1,12 +1,28 @@
 {
   "name": "hyperview-web",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "description": "HyperView web app (Next.js). Scaffold-only at M0; see ../hyperview/PLAN.md.",
   "scripts": {
-    "dev": "echo 'M0 scaffold — Next.js install pending' && exit 0",
-    "build": "echo 'M0 scaffold — Next.js install pending' && exit 0",
-    "typecheck": "echo 'M0 scaffold — typecheck pending' && exit 0",
-    "lint": "echo 'M0 scaffold — lint pending' && exit 0"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lightweight-charts": "^5.0.7",
+    "next": "^16.2.6",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.9",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "postcss": "^8.5",
+    "tailwindcss": "^4.1.9",
+    "typescript": "^5.6.3"
   }
 }

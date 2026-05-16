@@ -7,3 +7,4 @@ node_modules/
 .vercel
 .turbo
 next-env.d.ts
+*.tsbuildinfo
