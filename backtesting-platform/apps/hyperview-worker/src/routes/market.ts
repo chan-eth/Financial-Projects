@@ -51,7 +51,9 @@ export async function handleMarket(
   }
 
   if (path === "/market/candles") {
-    const parsed = CandlesQuery.safeParse(Object.fromEntries(url.searchParams));
+    const params: Record<string, string> = {};
+    url.searchParams.forEach((v, k) => { params[k] = v; });
+    const parsed = CandlesQuery.safeParse(params);
     if (!parsed.success) {
       throw new BadRequestError("invalid query", parsed.error.flatten());
     }

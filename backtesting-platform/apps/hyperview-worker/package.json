@@ -18,6 +18,8 @@
     "@bt/data": "workspace:*",
     "@bt/schemas": "workspace:*",
     "@hv/schemas": "workspace:*",
+    "@simplewebauthn/server": "^11.0.0",
+    "@simplewebauthn/types": "^11.0.0",
     "zod": "3.25.76"
   },
   "devDependencies": {

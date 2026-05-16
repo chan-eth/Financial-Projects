@@ -5,7 +5,8 @@
 // input with a Zod schema, (3) be covered by the per-milestone audit gate (§9).
 
 import { handleMarket } from "./routes/market.js";
-import { requireAuth } from "./auth.js";
+import { handleAuth } from "./routes/auth.js";
+import { requireAuth, type AuthContext } from "./auth.js";
 import { corsHeaders } from "./middleware/cors.js";
 import { HttpError, NotFoundError, TooManyRequestsError } from "./errors.js";
 import type { Env } from "./env.js";
@@ -33,7 +34,7 @@ export default {
         if (!success) throw new TooManyRequestsError(60);
       }
 
-      // Health probe — public, unauthenticated.
+      // Health probe — public.
       if (path === "/health" && request.method === "GET") {
         return finalize(
           Response.json({ ok: true, version: VERSION, milestone: "M0" }),
@@ -43,8 +44,19 @@ export default {
 
       // Public market-data proxy.
       if (path === "/market/meta" || path === "/market/candles") {
-        await requireAuth(request, "public");
+        await requireAuth(request, "public", env);
         return finalize(await handleMarket(request, env, url), cors);
+      }
+
+      // Passkey ceremony — public. Session-bound /auth/me and /auth/logout
+      // require the user scope.
+      if (path.startsWith("/auth/passkey/")) {
+        const ctx = await requireAuth(request, "public", env);
+        return finalize(await handleAuth(request, env, url, ctx), cors);
+      }
+      if (path === "/auth/me" || path === "/auth/logout") {
+        const ctx: AuthContext = await requireAuth(request, "user", env);
+        return finalize(await handleAuth(request, env, url, ctx), cors);
       }
 
       throw new NotFoundError();
