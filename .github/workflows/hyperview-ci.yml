@@ -44,6 +44,17 @@ jobs:
       - name: cargo test
         run: cargo test --all
 
+  hypescript-audit:
+    name: hypescript · cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustsec/audit-check@v2 expects Cargo.lock at the working-directory.
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: backtesting-platform/packages/hypescript
+
   web-typecheck-build:
     name: hyperview-web · typecheck + build
     runs-on: ubuntu-latest

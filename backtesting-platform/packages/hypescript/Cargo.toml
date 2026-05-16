@@ -5,13 +5,41 @@ edition = "2021"
 publish = false
 description = "HypeScript compiler and VM. Series-first scripting language for Hyperliquid-native indicators, strategies, and screeners."
 license = "MIT"
+rust-version = "1.78"
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
 
+# Per PLAN §12.11 — M1 dependency wiring. Each crate is present from day 1 so
+# `cargo check` exercises the resolved dependency graph CI will see throughout
+# the milestone, even though most modules are empty stubs today.
+
 [dependencies]
+blake3 = "1.5"
+serde = { version = "1", features = ["derive"] }
+
+# CBOR codec for the .hvb manifest section (PLAN §12.4). ciborium is the
+# maintained successor to serde_cbor (which was last touched in 2021 and is
+# flagged unmaintained by RUSTSEC-2021-0127).
+ciborium = "0.2"
+
+# WASM target — web playground (play.hyperview.xyz) + hyperview-worker edge eval.
+wasm-bindgen = "0.2"
+
+# Native bindings — iOS + Android via UniFFI (one IDL → Swift + Kotlin per PLAN §4).
+uniffi = { version = "0.28" }
+
+# LSP server (`hype-lsp` binary, lands in `src/bin/`).
+tower-lsp = "0.20"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
 
 [dev-dependencies]
+# Snapshot tests for lexer/parser/IR per PLAN §12.8 (regenerate with `cargo insta review`).
+insta = "1.39"
 
-# Targets and UniFFI dependencies wired in M1; left empty at M0 so `cargo check`
-# succeeds in CI without pulling unrelated downloads.
+# Differential test against the TS engine — see PLAN §12.8 test 4 and §12.10.5.
+# Path is explicit so we can keep the planned tests/{golden,integration,diff,unit}/
+# tree per §12.11 without one-file-per-binary at the root.
+[[test]]
+name = "ema_vs_ts"
+path = "tests/diff/ema_vs_ts.rs"
