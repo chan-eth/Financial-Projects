@@ -1,10 +1,29 @@
-//! HypeScript compiler and VM — M0 scaffolding only.
+//! HypeScript compiler + VM library.
 //!
-//! Language spec: `hyperview/docs/HYPESCRIPT.md`.
-//! Implementation plan: `hyperview/PLAN.md` §2 (compiler pipeline) and §8 (M1 milestone).
+//! Public surface stabilizes as M1 modules land. Today's scaffold registers
+//! the planned module tree (per PLAN §12.3 / §12.11) so that downstream
+//! refactors don't have to move imports as implementation arrives.
 //!
-//! At M0 this crate intentionally exports nothing usable. The full module tree
-//! (lexer, parser, sema, ir, codegen, vm, stdlib) lands across M1.
+//! Pipeline (per PLAN §2 + §12.3):
+//!
+//!   source → [lexer] → tokens → [parser] → [ast] → [sema] →
+//!     typed-AST → [ir] (typed SSA) → [pass] (fold/DCE/series-fusion) →
+//!     [codegen] → bytecode (.hvb) → [vm] (stack VM)
+//!
+//! The [`stdlib`] module declares the builtin overload tables that [`sema`]
+//! and [`codegen`] both consult.
+
+#![allow(unused)] // Until M1 modules fill in — keeps `cargo check` quiet.
+
+pub mod ast;
+pub mod codegen;
+pub mod ir;
+pub mod lexer;
+pub mod parser;
+pub mod pass;
+pub mod sema;
+pub mod stdlib;
+pub mod vm;
 
 /// Compile-time version banner. Bumped per milestone.
-pub const VERSION: &str = "0.0.0-m0";
+pub const VERSION: &str = "0.0.0-m1-scaffold";
