@@ -5,7 +5,10 @@
     "types": ["@cloudflare/workers-types"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "noEmit": false
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022"
   },
   "include": ["src/**/*.ts"]
 }

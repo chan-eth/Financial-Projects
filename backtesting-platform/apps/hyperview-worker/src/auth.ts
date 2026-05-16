@@ -1,21 +1,17 @@
-// HyperView worker auth fence — M0 stub.
+// HyperView worker auth fence.
 //
 // Modeled on backtesting-platform/apps/worker/src/auth.ts but extended for end-user
-// requests. The existing fence only knows operator-email and internal-secret paths.
-// HyperView adds:
-//   1. Passkey-attested user sessions (P-256, WebAuthn) — set by /auth/passkey/verify.
-//   2. Distinct trading scope: POST /orders and POST /subaccount require a fresh
-//      device-attestation token (App Attest / Play Integrity) within the last 5 min.
+// requests. Three scopes are reachable at M0:
 //
-// Implementation lands in M0 (passkey path) and M5 (trading scope). This file currently
-// declares the public surface only so callers can be wired before logic is filled in.
+//   - public:        no auth required. Market data reads, health probe.
+//   - operator:      placeholder — wired in M0b alongside the admin surface.
+//   - internal:      server-to-server, constant-time check against WORKER_INTERNAL_SECRET.
+//
+// The remaining two scopes (user, user.trading) require passkey-attested sessions
+// and land in M0b (passkey auth e2e) and M5 (trading scope) respectively. Until
+// then, requireAuth() throws UnauthorizedError for them.
 
-export class UnauthorizedError extends Error {
-  constructor(message = "Unauthorized") {
-    super(message);
-    this.name = "UnauthorizedError";
-  }
-}
+import { UnauthorizedError } from "./errors.js";
 
 export type AuthScope = "public" | "user" | "user.trading" | "operator" | "internal";
 
@@ -26,8 +22,31 @@ export interface AuthContext {
 }
 
 export async function requireAuth(
-  _request: Request,
-  _scope: AuthScope,
+  request: Request,
+  scope: AuthScope,
+  internalSecret?: string,
 ): Promise<AuthContext> {
-  throw new UnauthorizedError("auth fence not implemented in M0 scaffold");
+  if (scope === "public") {
+    return { scope: "public" };
+  }
+
+  if (scope === "internal") {
+    const provided = request.headers.get("x-internal-secret");
+    if (!internalSecret || !provided || !constantTimeEquals(provided, internalSecret)) {
+      throw new UnauthorizedError("missing or invalid internal secret");
+    }
+    return { scope: "internal" };
+  }
+
+  // user / user.trading / operator land in M0b and M5.
+  throw new UnauthorizedError(`auth scope ${scope} not implemented yet`);
+}
+
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
 }

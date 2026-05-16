@@ -17,7 +17,18 @@ Separate from the existing `apps/worker/` (the backtester worker). Reasons: inde
 
 ## Status
 
-**M0 scaffolding.** Currently contains a health endpoint stub and an auth-fence skeleton. Real endpoints land in M0 (health + market REST proxy), M1 (scripts read), M2 (alerts + scripts publish + billing), M5 (orders).
+**M0 in progress.** Live now: health probe, market-data REST proxy, D1 schema (migrations 0010–0017), auth fence for `public`/`internal` scopes, CORS + per-IP rate limiting. Pending in M0b: passkey auth e2e (`user` scope), Lightweight Charts live chart on the web app.
+
+| Endpoint | Status |
+|---|---|
+| `GET /health` | Live |
+| `GET /market/meta` | Live (proxies Hyperliquid `meta`) |
+| `GET /market/candles` | Live (proxies Hyperliquid `candleSnapshot`) |
+| `POST /auth/passkey/*` | M0b |
+| `POST /alerts`, `WS /stream/...` | M2 |
+| `GET/POST /scripts/*` | M1 read, M2 publish |
+| `POST /orders` | M5 |
+| `POST /billing/webhook/{stripe,revenuecat}` | M2 |
 
 ## Local dev
 

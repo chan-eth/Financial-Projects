@@ -21,7 +21,30 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
-  apps/hyperview-worker: {}
+  apps/hyperview-worker:
+    dependencies:
+      '@bt/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+      '@bt/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+      '@hv/schemas':
+        specifier: workspace:*
+        version: link:../../packages/hv-schemas
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251101.0
+        version: 4.20260511.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^3.95.0
+        version: 3.114.17(@cloudflare/workers-types@4.20260511.1)
 
   apps/web:
     dependencies:
@@ -248,7 +271,18 @@ importers:
 
   packages/hv-charts: {}
 
-  packages/hv-schemas: {}
+  packages/hv-schemas:
+    dependencies:
+      '@bt/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/hv-trading: {}
 

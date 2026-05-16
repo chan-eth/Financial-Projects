@@ -3,12 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "main": "src/index.ts",
   "scripts": {
-    "dev": "echo 'M0 scaffold — wrangler dev pending'",
-    "build": "echo 'M0 scaffold — esbuild bundle pending'",
-    "typecheck": "echo 'M0 scaffold — typecheck pending'",
-    "lint": "echo 'M0 scaffold — lint pending'",
-    "deploy:staging": "echo 'wrangler deploy --env staging — wired in M0 follow-up'",
-    "deploy:production": "echo 'wrangler deploy --env production — wired in M0 follow-up'"
+    "dev": "wrangler dev",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "migrate:local": "wrangler d1 migrations apply hyperview-dev --local",
+    "migrate:staging": "wrangler d1 migrations apply hyperview-staging --env staging --remote",
+    "migrate:production": "wrangler d1 migrations apply hyperview --env production --remote"
+  },
+  "dependencies": {
+    "@bt/data": "workspace:*",
+    "@bt/schemas": "workspace:*",
+    "@hv/schemas": "workspace:*",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.95.0"
   }
 }

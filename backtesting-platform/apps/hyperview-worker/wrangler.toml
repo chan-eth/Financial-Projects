@@ -1,14 +1,56 @@
 # HyperView worker — Cloudflare Workers config.
-# Placeholder values only at M0. Real account IDs, D1/R2 IDs, route hostnames
-# are filled in as part of the M0 deploy-prep PR (after staging.api.hyperview.xyz
-# DNS is provisioned). Do NOT commit production secrets here — use `wrangler secret put`.
+# Placeholder IDs at M0; filled in via `wrangler d1 create` + `wrangler kv:namespace
+# create` once staging.hyperview.xyz DNS is provisioned. Never commit production
+# secrets here — use `wrangler secret put <NAME> --env <env>`.
 
-name = "hyperview-worker"
+name = "hyperview-worker-dev"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 
-# ---- staging ----
+[observability]
+enabled = true
+
+# ---- local dev defaults ----
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hyperview-dev"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "hyperview-data-dev"
+
+[[unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+[[unsafe.bindings]]
+name = "RL_ORDERS"
+type = "ratelimit"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:3000"
+HYPERLIQUID_API_BASE = "https://api.hyperliquid-testnet.xyz"
+RATE_LIMIT_GLOBAL_PER_MIN = "60"
+RATE_LIMIT_ORDERS_PER_MIN = "10"
+
+# Secrets (set per env via `wrangler secret put`):
+#   WORKER_INTERNAL_SECRET     — server-to-server auth from the Vercel proxy
+#   STRIPE_WEBHOOK_SECRET      — Stripe webhook signature verification
+#   REVENUECAT_WEBHOOK_SECRET  — RevenueCat webhook signature verification
+
+# -----------------------------------------------------------------------------
+# Staging
+# -----------------------------------------------------------------------------
+
 [env.staging]
 name = "hyperview-worker-staging"
 # routes = [{ pattern = "staging.api.hyperview.xyz/*", zone_name = "hyperview.xyz" }]
@@ -19,16 +61,32 @@ HYPERLIQUID_API_BASE = "https://api.hyperliquid-testnet.xyz"
 RATE_LIMIT_GLOBAL_PER_MIN = "60"
 RATE_LIMIT_ORDERS_PER_MIN = "10"
 
-# [[env.staging.d1_databases]]
-# binding = "DB"
-# database_name = "hyperview-staging"
-# database_id = "TODO-fill-after-create"
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "hyperview-staging"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
 
-# [[env.staging.r2_buckets]]
-# binding = "DATA"
-# bucket_name = "hyperview-data-staging"
+[[env.staging.r2_buckets]]
+binding = "DATA"
+bucket_name = "hyperview-data-staging"
 
-# ---- production ----
+[[env.staging.unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.unsafe.bindings]]
+name = "RL_ORDERS"
+type = "ratelimit"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }
+
+# -----------------------------------------------------------------------------
+# Production
+# -----------------------------------------------------------------------------
+
 [env.production]
 name = "hyperview-worker"
 # routes = [{ pattern = "api.hyperview.xyz/*", zone_name = "hyperview.xyz" }]
@@ -39,11 +97,24 @@ HYPERLIQUID_API_BASE = "https://api.hyperliquid.xyz"
 RATE_LIMIT_GLOBAL_PER_MIN = "60"
 RATE_LIMIT_ORDERS_PER_MIN = "10"
 
-# [[env.production.d1_databases]]
-# binding = "DB"
-# database_name = "hyperview"
-# database_id = "TODO-fill-after-create"
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "hyperview"
+database_id = "REPLACE_ME_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
 
-# [[env.production.r2_buckets]]
-# binding = "DATA"
-# bucket_name = "hyperview-data"
+[[env.production.r2_buckets]]
+binding = "DATA"
+bucket_name = "hyperview-data"
+
+[[env.production.unsafe.bindings]]
+name = "RL_GLOBAL"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+[[env.production.unsafe.bindings]]
+name = "RL_ORDERS"
+type = "ratelimit"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }
