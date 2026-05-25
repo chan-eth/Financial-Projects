@@ -13,8 +13,8 @@
     "@simplewebauthn/browser": "^11.0.0",
     "lightweight-charts": "^5.0.7",
     "next": "^16.2.6",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
     "zod": "3.25.76"
   },
   "devDependencies": {
